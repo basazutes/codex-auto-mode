@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Codex Auto Mode — what it is now, and how to migrate from --full-auto</title>
+<meta name="description" content="In today's OpenAI Codex CLI, auto mode is the built-in preset that pairs workspace-write sandbox with on-request approvals. --full-auto was removed in v0.147.0; use --sandbox workspace-write instead.">
+<link rel="canonical" href="https://basazutes.github.io/codex-auto-mode/">
+<meta property="og:title" content="Codex Auto Mode — what it is now, and how to migrate from --full-auto">
+<meta property="og:description" content="auto = workspace-write sandbox + on-request approvals. --full-auto was removed in v0.147.0.">
+<meta property="og:type" content="article">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="wrap">
+  <p class="eyebrow">Codex CLI reference · updated 2026-11-19</p>
+  <h1>Codex auto mode, in one page</h1>
+  <p class="lede">
+    In today&rsquo;s OpenAI Codex CLI, <strong>auto mode</strong> is one of three built-in presets. It lets Codex read and edit files in the current workspace and run commands, and asks you before it touches files outside the workspace or uses the internet. The legacy <code>--full-auto</code> flag is gone; this page shows what to use instead.
+  </p>
+</header>
+
+<main class="wrap">
+
+<section class="card tldr">
+  <h2>TL;DR</h2>
+  <ul>
+    <li><strong>auto</strong> = <code>sandbox: workspace-write</code> + <code>approval_policy: on-request</code>. Labeled &ldquo;Default&rdquo; in Codex. <a href="#source-preset">source</a></li>
+    <li>Three built-in presets: <code>read-only</code>, <code>auto</code>, <code>full-access</code>. <a href="#source-preset">source</a></li>
+    <li><code>--full-auto</code> was removed in Codex <code>v0.147.0</code> (2026-08-07). Use <code>--sandbox workspace-write</code>. <a href="#source-removed">source</a></li>
+    <li>The corresponding global flag for &ldquo;skip every prompt&rdquo; is <code>--dangerously-bypass-approvals-and-sandbox</code>. Use it only in a disposable VM or container. <a href="#source-bypass">source</a></li>
+  </ul>
+</section>
+
+<section>
+  <h2 id="the-three-presets">The three presets</h2>
+  <p>Codex ships three built-in approval presets. Each pairs an <em>approval policy</em> (when it asks you) with a <em>permission profile</em> (what it can touch without asking).</p>
+  <div class="grid">
+    <article class="preset">
+      <h3>read-only</h3>
+      <p class="pair"><code>approval: on-request</code> · <code>profile: read-only</code></p>
+      <p>Codex can read files in the current workspace. It asks you to edit files or access the internet.</p>
+    </article>
+    <article class="preset preset--default">
+      <h3>auto <span class="tag">Default</span></h3>
+      <p class="pair"><code>approval: on-request</code> · <code>sandbox: workspace-write</code></p>
+      <p>Codex can read and edit files in the current workspace, and run commands. Approval is required to access the internet or edit other files. Identical to Agent mode.</p>
+    </article>
+    <article class="preset">
+      <h3>full-access</h3>
+      <p class="pair"><code>approval: never</code> · <code>profile: disabled</code></p>
+      <p>Codex can edit files outside this workspace and access the internet without asking. Use with caution.</p>
+    </article>
+  </div>
+  <p class="src">Source: <a href="#source-preset"><code>codex-rs/utils/approval-presets/src/lib.rs</code></a>.</p>
+</section>
+
+<section>
+  <h2 id="how-to-turn-it-on">How to turn auto mode on</h2>
+  <h3>From the command line, one off</h3>
+<pre><code>codex --sandbox workspace-write --approval-mode on-request
+# or the short form of --sandbox:
+codex -s workspace-write</code></pre>
+
+  <h3>In <code>~/.codex/config.toml</code>, as the default</h3>
+<pre><code>sandbox_mode    = "workspace-write"
+approval_policy = "on-request"</code></pre>
+
+  <p>
+    Both keys accept the kebab-case values shown in <a href="#source-sandbox"><code>config_types.rs</code></a>: <code>read-only</code>, <code>workspace-write</code>, <code>danger-full-access</code> for the sandbox; <code>on-request</code>, <code>never</code> for the approval policy.
+  </p>
+</section>
+
+<section>
+  <h2 id="migrating">Migrating from <code>--full-auto</code></h2>
+  <p>
+    If you came here because <code>codex --full-auto</code> or <code>full-auto = true</code> stopped working, the flag was removed in <code>v0.147.0</code>. Two common mappings:
+  </p>
+  <table>
+    <thead><tr><th>Old</th><th>New</th><th>What changes</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>codex --full-auto</code></td>
+        <td><code>codex --sandbox workspace-write</code></td>
+        <td>Same effective behaviour: edits inside the workspace, asks for the internet and for files outside.</td>
+      </tr>
+      <tr>
+        <td><code>codex --full-auto --dangerously-auto-approve-everything</code> (old variants)</td>
+        <td><code>codex --dangerously-bypass-approvals-and-sandbox</code></td>
+        <td>No sandbox, no prompts. Only in a disposable VM or container.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="src">Source for the removal: <a id="source-removed" href="https://github.com/openai/codex/issues/2138">openai/codex#2138</a> &mdash; &ldquo;<code>--full-auto</code> was removed in Codex 0.147.0 (7 August 2026). The release note says to use <code>--sandbox workspace-write</code> instead.&rdquo;</p>
+</section>
+
+<section>
+  <h2 id="which-preset">Which preset should you use</h2>
+  <ul>
+    <li><strong>You&rsquo;re reviewing someone else&rsquo;s repo, or you don&rsquo;t want file writes yet.</strong> <code>read-only</code>.</li>
+    <li><strong>You&rsquo;re doing normal coding in a repo you trust.</strong> <code>auto</code>. This is the default and matches the old <code>--full-auto</code> expectation.</li>
+    <li><strong>You&rsquo;re running Codex in a disposable VM or container where nothing on the host matters.</strong> <code>full-access</code>, or use <code>--dangerously-bypass-approvals-and-sandbox</code> for a one-off.</li>
+  </ul>
+  <p class="warn">
+    <code>danger-full-access</code> / <code>--dangerously-bypass-approvals-and-sandbox</code> turn off the sandbox and the approval prompts at the same time. Codex can delete files anywhere you have access to, and can make network calls without asking. Use it only when the environment is disposable.
+  </p>
+</section>
+
+<section>
+  <h2 id="faq">Short FAQ</h2>
+
+  <h3>Does auto mode skip all prompts?</h3>
+  <p>No. It skips approval for writes inside the workspace and for running commands. It still asks before editing files outside the workspace or using the internet.</p>
+
+  <h3>Is &ldquo;Agent mode&rdquo; the same as auto?</h3>
+  <p>Yes. The preset&rsquo;s own description says &ldquo;Identical to Agent mode.&rdquo; <a href="#source-preset">source</a></p>
+
+  <h3>Is there a Codex YOLO mode?</h3>
+  <p>Not under that name. The closest thing is the <code>full-access</code> preset, or the one-off flag <code>--dangerously-bypass-approvals-and-sandbox</code>, which removes both the sandbox and every approval prompt. Use it only in a disposable VM or container. <a href="#source-bypass">source</a></p>
+
+  <h3>How do I make Codex auto-approve everything?</h3>
+  <p>Set <code>--approval-mode never</code> (or <code>approval_policy = "never"</code> in config.toml). On its own that only stops the prompts; what Codex may touch still depends on the sandbox. Pair it with <code>workspace-write</code> to keep edits inside the repo, or with <code>danger-full-access</code> to lift every limit. <a href="#source-sandbox">source</a></p>
+
+  <h3>Codex says <code>approval_policy = "untrusted" is no longer supported</code></h3>
+  <p>Remove that line from <code>~/.codex/config.toml</code>. The only approval values left are <code>on-request</code> and <code>never</code>; <code>on-request</code> is the closest match to the old behaviour. <a href="https://github.com/openai/codex/blob/main/codex-rs/core/src/config/mod.rs">source</a></p>
+
+  <h3>What&rsquo;s the difference between <code>--sandbox</code> and <code>--approval-mode</code>?</h3>
+  <p><code>--sandbox</code> controls what Codex can touch without asking. <code>--approval-mode</code> controls when it stops to ask you. The preset <code>auto</code> is just the common pairing of <code>workspace-write</code> and <code>on-request</code>.</p>
+
+  <h3>Where do I set this permanently?</h3>
+  <p>In <code>~/.codex/config.toml</code>. The CLI flag wins for one session.</p>
+
+  <h3>I&rsquo;m outside a git repo and Codex refuses to run.</h3>
+  <p>Add <code>--skip-git-repo-check</code>. Flag defined in <code>codex-rs/exec/src/cli.rs</code>.</p>
+</section>
+
+<section class="sources" aria-label="Sources">
+  <h2 id="sources">Sources</h2>
+  <ol>
+    <li id="source-preset"><a href="https://github.com/openai/codex/blob/main/codex-rs/utils/approval-presets/src/lib.rs"><code>codex-rs/utils/approval-presets/src/lib.rs</code></a> &mdash; the three presets and their descriptions.</li>
+    <li id="source-sandbox"><a href="https://github.com/openai/codex/blob/main/codex-rs/protocol/src/config_types.rs"><code>codex-rs/protocol/src/config_types.rs</code></a> &mdash; <code>SandboxMode</code> enum: <code>read-only</code> (default), <code>workspace-write</code>, <code>danger-full-access</code>.</li>
+    <li><a href="https://github.com/openai/codex/blob/main/codex-rs/utils/cli/src/sandbox_mode_cli_arg.rs"><code>sandbox_mode_cli_arg.rs</code></a> and <a href="https://github.com/openai/codex/blob/main/codex-rs/utils/cli/src/approval_mode_cli_arg.rs"><code>approval_mode_cli_arg.rs</code></a> &mdash; CLI values for <code>--sandbox</code> and <code>--approval-mode</code>.</li>
+    <li id="source-bypass"><a href="https://github.com/openai/codex/blob/main/codex-rs/exec/src/cli.rs"><code>codex-rs/exec/src/cli.rs</code></a> &mdash; global flags including <code>--skip-git-repo-check</code> and <code>--dangerously-bypass-approvals-and-sandbox</code>.</li>
+    <li><a href="https://github.com/openai/codex/issues/2138">openai/codex#2138</a> &mdash; the removal of <code>--full-auto</code> in 0.147.0.</li>
+  </ol>
+</section>
+
+</main>
+
+<footer class="wrap">
+  <p>
+    This page is kept small on purpose. Facts are pulled from the <a href="https://github.com/openai/codex">openai/codex</a> repo; if a line here doesn&rsquo;t match the source, the source is right.
+  </p>
+  <p class="meta">
+    Published 2026-11-16 · Last verified against openai/codex <code>main</code> on 2026-11-19.
+  </p>
+</footer>
+</body>
+</html>
